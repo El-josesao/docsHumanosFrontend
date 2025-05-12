@@ -1,0 +1,8 @@
+/* src/assets/base.css o main.css */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Noto+Sans:wght@400;700&family=Open+Sans:wght@400;700&display=swap');
+
+/* Otros estilos globales base pueden ir aquí debajo */
+body { margin: 0;
+    font-family: 'Noto Sans', 'Montserrat', 'Open Sans', ui-sans-serif, system-ui, sans-serif;
+   
+}
