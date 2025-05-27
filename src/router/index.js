@@ -4,7 +4,9 @@ import { useAuthStore } from '@/stores/auth';
 // --- Component Imports ---
 import HojaServicioForm from "../components/HojaServicioForm.vue";
 import LoginPage from "../views/LoginPage.vue";
-
+// --- NUEVAS IMPORTACIONES ---
+import NotasBuenasIndex from "../views/NotasBuenasIndex.vue";
+import NotaBuenaForm from "../components/NotaBuenaForm.vue";
 // --- Definición de Rutas ---
 const routes = [
   // RUTA LOGIN (PÚBLICA)
@@ -54,6 +56,19 @@ const routes = [
       import(
         /* webpackChunkName: "admin-config" */ "../components/AdminConfig.vue"
       ),
+    meta: { requiresAuth: true },
+  },
+    // --- NUEVAS RUTAS PARA NOTAS BUENAS ---
+  {
+    path: "/notas-buenas",
+    name: "ListarNotasBuenas",
+    component: NotasBuenasIndex,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/notas-buenas/crear",
+    name: "CrearNotaBuena",
+    component: NotaBuenaForm,
     meta: { requiresAuth: true },
   },
 ];

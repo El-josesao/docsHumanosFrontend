@@ -6,11 +6,11 @@ import { useAuthStore } from '@/stores/auth';
 // Componentes PrimeVue
 import Button from 'primevue/button';
 import Toast from 'primevue/toast';
-import Menubar from 'primevue/menubar'; // <-- 1. Importar Menubar
+import Menubar from 'primevue/menubar'; // <-- Menubar ya está importado
 
 // --- Instancias ---
 const authStore = useAuthStore();
-const router = useRouter(); // Router ya no se usa para navegar desde aquí, pero puede ser útil para otras cosas
+const router = useRouter(); 
 
 // --- Lógica del Ciclo de Vida ---
 onMounted(() => {
@@ -21,41 +21,42 @@ onMounted(() => {
 });
 
 // --- Definición de los items del Menú ---
-// Usamos 'computed' para que reaccione si el estado de login cambia
-// En App.vue, dentro de computed para menuItems
 const menuItems = computed(() => {
   if (authStore.isLoggedIn) {
     return [
       {
         label: 'Crear Hoja',
         icon: 'pi pi-file-plus',
-        // to: { name: 'CrearHoja' } // Comentado o eliminado
-        command: () => { // <-- Usar command
-            console.log('Navegando a CrearHoja...'); // Log para ver si se ejecuta
+        command: () => { 
             router.push({ name: 'CrearHoja' }); 
         }
       },
       {
         label: 'Ver Lista',
         icon: 'pi pi-list',
-        // to: { name: 'ListarHojas' } // Comentado o eliminado
-        command: () => { // <-- Usar command
-            console.log('Navegando a ListarHojas...'); // Log para ver si se ejecuta
+        command: () => { 
             router.push({ name: 'ListarHojas' });
         }
       },
+      // --- NUEVO ENLACE A NOTAS BUENAS ---
+      {
+        label: 'Notas Buenas', // Etiqueta para el menú
+        icon: 'pi pi-star',    // Icono sugerido (puedes cambiarlo)
+        command: () => {
+            router.push({ name: 'ListarNotasBuenas' }); // Navega a la vista de lista
+        }
+      },
+      // --- FIN NUEVO ENLACE ---
       {
         label: 'Configuración',
         icon: 'pi pi-cog',
-        // to: { name: 'AdminConfig' } // Comentado o eliminado
-        command: () => { // <-- Usar command
-            console.log('Navegando a AdminConfig...'); // Log para ver si se ejecuta
+        command: () => { 
             router.push({ name: 'AdminConfig' });
         }
       }
     ];
   } else {
-    return [];
+    return []; // No mostrar items si no está logueado
   }
 });
 
@@ -66,7 +67,6 @@ const handleLogout = async () => {
     await authStore.logout();
 }
 
-// La función navigateTo ya no es necesaria para los items del menú
 </script>
 
 <template>
@@ -76,7 +76,9 @@ const handleLogout = async () => {
 
     <Menubar :model="menuItems" class="app-menubar p-px-3 p-py-1">
       <template #start>
-        <h4 class="p-m-0 p-mr-3">Mi Aplicación</h4> </template>
+        <img alt="logo" src="/vite.svg" height="40" class="mr-2" @click="() => router.push('/')" style="cursor:pointer;" />
+        <h4 class="p-m-0 p-mr-3" @click="() => router.push('/')" style="cursor:pointer;">Docs Humanos</h4>
+      </template>
 
       <template #end>
         <div v-if="authStore.isLoggedIn" class="user-info p-d-flex p-ai-center">
@@ -92,6 +94,7 @@ const handleLogout = async () => {
             </div>
          <div v-else>
              <Button
+                 v-if="router.currentRoute.value.name !== 'Login'"
                  label="Login"
                  icon="pi pi-sign-in"
                  class="p-button-text"
@@ -113,17 +116,21 @@ const handleLogout = async () => {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  background-color: var(--p-surface-ground); /* Un fondo general para la app */
 }
 
-/* Ajustar el estilo del Menubar si es necesario */
-/* El Menubar ya tiene su propio fondo y estructura, puede que no necesites .app-header */
 .app-menubar {
-  border-radius: 0; /* Para que ocupe todo el ancho sin bordes redondeados */
-  border-bottom: 1px solid var(--p-surface-300);
-  background-color: var(--p-surface-100); /* O el color que prefieras */
+  border-radius: 0; 
+  border-bottom: 1px solid var(--p-surface-border); /* Usar variables de tema de PrimeVue */
+  background-color: var(--p-surface-card); /* Fondo para la barra de menú */
+  padding: 0.5rem 1rem; /* Ajustar padding si es necesario */
 }
 
-/* Los estilos para .nav-links y sus botones ya no son necesarios */
+.app-menubar .p-menubar-start h4,
+.app-menubar .p-menubar-start img {
+    margin-right: 0.5rem; /* Espacio entre logo/título y los items */
+}
+
 
 .user-info {
   /* Estilos adicionales si son necesarios */
@@ -132,26 +139,32 @@ const handleLogout = async () => {
 .welcome-user {
     color: var(--p-text-color-secondary);
     font-size: 0.9em;
-    white-space: nowrap; /* Evitar que el nombre se parta en dos líneas */
+    white-space: nowrap; 
 }
 
 .app-main-content {
   flex-grow: 1;
-  padding: 1.5rem;
-  background-color: var(--p-surface-0);
+  padding: 1.5rem; /* Espacio alrededor del contenido principal */
 }
 
-/* Asegurarse de que los items del menú usen el color primario (si no lo hacen por defecto) */
-/* Puede que no sea necesario si el tema se aplica bien */
-:deep(.p-menubar .p-menuitem-link) {
-    /* color: var(--p-primary-color); */ /* Descomentar si es necesario */
+/* Estilo para los items del menú para que se vean más como botones/enlaces */
+:deep(.p-menubar .p-menuitem > .p-menuitem-content > .p-menuitem-link) {
+    padding: 0.75rem 1rem;
+    transition: background-color 0.2s;
+}
+:deep(.p-menubar .p-menuitem > .p-menuitem-content > .p-menuitem-link:hover) {
+    background-color: var(--p-surface-hover);
 }
 
 /* Estilo opcional para el item activo */
-:deep(.p-menubar .p-menuitem.p-highlight > .p-menuitem-link) {
+:deep(.p-menubar .p-menuitem.p-highlight > .p-menuitem-content > .p-menuitem-link) {
     background-color: var(--p-highlight-background);
-    color: var(--p-highlight-color); /* Asegurar contraste */
+    color: var(--p-highlight-color);
 }
 
+:deep(.p-menubar .p-menuitem.p-highlight > .p-menuitem-content > .p-menuitem-link .p-menuitem-text),
+:deep(.p-menubar .p-menuitem.p-highlight > .p-menuitem-content > .p-menuitem-link .p-menuitem-icon) {
+    color: var(--p-highlight-color); /* Asegurar que el texto e icono también cambien */
+}
 
 </style>

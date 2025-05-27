@@ -2,45 +2,49 @@
 // --- Importaciones ---
 import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import axiosInstance from '@/plugins/axios.js';
+import axiosInstance from '@/plugins/axios.js'; // Asegúrate que esta sea tu instancia configurada de Axios
 
 // --- Importaciones de Componentes PrimeVue ---
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
-import Select from 'primevue/select'; // <--- ACTUALIZADO: Usar Select en lugar de Dropdown
+import Select from 'primevue/select';
 import Calendar from 'primevue/calendar';
 import Fieldset from 'primevue/fieldset';
 import Message from 'primevue/message';
 import ProgressSpinner from 'primevue/progressspinner';
-import FloatLabel from 'primevue/floatlabel'; // Importar FloatLabel explícitamente
+import FloatLabel from 'primevue/floatlabel';
+// import { useToast } from 'primevue/usetoast'; // Descomenta si configuras ToastService
 
 // --- Setup (Router, Route, ID de Hoja, Modo Edición) ---
 const router = useRouter();
 const route = useRoute();
 const hojaId = ref(route.params.hojaId || null);
 const isEditing = computed(() => !!hojaId.value);
+// const toast = useToast(); // Descomenta si configuras ToastService
 
 // --- Estado Reactivo del Componente ---
 const hojaData = reactive({
   personal_id: null,
   periodo_id: null,
-  fecha_expedicion: new Date().toISOString().slice(0, 10),
+  fecha_expedicion: new Date().toISOString().slice(0, 10), // Para Calendar, mejor manejar como Date
   jefe_inmediato_id: null,
   observaciones: '',
 });
+// Para el Calendar principal, también es buena práctica usar un ref separado para el objeto Date si v-model es string
+const fechaExpedicionDate = ref(new Date()); // Para el Calendar de fecha_expedicion
+
 const incidencias = ref([]);
-const personalList = ref([]); // Contendrá objetos { id: ..., displayLabel: ..., nombre: ... }
-const periodosList = ref([]); // Contendrá objetos { id: ..., nombre: ... }
+const personalList = ref([]);
+const periodosList = ref([]);
 const isLoadingSubmit = ref(false);
 const isLoadingData = ref(false);
 const errorMessage = ref('');
 const validationErrors = ref({});
 
 // --- Opciones Calculadas para Selectores ---
-// No necesitan cambios, ya que Select usa las mismas props para opciones
 const personalDropdownOptions = computed(() => {
-  return personalList.value; // Ya tiene displayLabel
+  return personalList.value;
 });
 const tiposIncidenciaOptions = ref([
     { value: 'NB', label: 'Notas Buenas' }, { value: 'FE', label: 'Felicitaciones' },
@@ -48,19 +52,32 @@ const tiposIncidenciaOptions = ref([
     { value: 'AM', label: 'Amonestación' }, { value: 'SU', label: 'Suplencia' },
 ]);
 const periodosDropdownOptions = computed(() => {
-    return periodosList.value; // Asume que la API devuelve {id: ..., nombre: ...}
+    return periodosList.value;
 });
 
-// --- Métodos (sin cambios en la lógica interna) ---
+// --- Métodos ---
+const formatDateToString = (dateObj) => {
+  if (!dateObj) return null;
+  if (typeof dateObj === 'string') { // Si ya es un string YYYY-MM-DD (o parcial ISO)
+    if (dateObj.includes('T')) return dateObj.slice(0,10);
+    return dateObj; // Asumir que ya está en formato YYYY-MM-DD
+  }
+  if (dateObj instanceof Date) {
+    const year = dateObj.getFullYear();
+    const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+    const day = dateObj.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return null; // Devolver null si no se puede formatear
+};
 
 const fetchPersonal = async () => {
   try {
     const response = await axiosInstance.get('/api/personal');
-    // Asegurarse que el formato sea el esperado por el computed property
     personalList.value = response.data.map(p => ({
         id: p.id,
-        displayLabel: `${p.nombre} (RFC: ${p.rfc})`, // Usado por Select
-        nombre: p.nombre // Dato original
+        displayLabel: `${p.nombre} (RFC: ${p.rfc || 'N/A'})`,
+        nombre: p.nombre
     }));
   } catch (error) {
     console.error("Error fetching personal:", error);
@@ -71,7 +88,7 @@ const fetchPersonal = async () => {
 const fetchPeriodos = async () => {
   try {
     const response = await axiosInstance.get('/api/periodos');
-    periodosList.value = response.data; // Asume formato { id: ..., nombre: ... }
+    periodosList.value = response.data;
   } catch (error) {
     console.error("Error fetching periodos:", error);
     errorMessage.value = "No se pudo cargar la lista de periodos.";
@@ -88,25 +105,39 @@ const fetchHojaData = async (id) => {
     const data = response.data;
     console.log("[fetchHojaData] Datos recibidos:", data);
 
-    // Asignación de datos (sin cambios)
     hojaData.personal_id = data.personal_id;
     hojaData.periodo_id = data.periodo_id;
+    // Para Calendar, es mejor trabajar con objetos Date internamente si es posible
     hojaData.fecha_expedicion = data.fecha_expedicion ? data.fecha_expedicion.slice(0, 10) : null;
+    if (data.fecha_expedicion) { // Actualizar el ref para Calendar
+        const parts = data.fecha_expedicion.split('-');
+        fechaExpedicionDate.value = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    }
+
     hojaData.jefe_inmediato_id = data.jefe_inmediato_id;
     hojaData.observaciones = data.observaciones;
 
-    incidencias.value = (data.registros_incidencia || []).map(inc => ({
-        ...inc,
-        fecha: inc.fecha ? inc.fecha.slice(0, 10) : null
-    }));
-    console.log("[fetchHojaData] Incidencias cargadas y formateadas:", incidencias.value);
+    incidencias.value = (data.registros_incidencia || []).map(inc => {
+        let fechaParaCalendar = null;
+        if (inc.fecha) {
+            const dateStr = inc.fecha.slice(0, 10);
+            const parts = dateStr.split('-');
+            // Para el v-model de Calendar es mejor usar objeto Date
+            fechaParaCalendar = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        }
+        return {
+            ...inc, // Copiar todos los campos, incluyendo id si viene
+            fecha: fechaParaCalendar // Usar objeto Date para el Calendar
+        };
+    });
+    console.log("[fetchHojaData] Incidencias cargadas y formateadas:", JSON.parse(JSON.stringify(incidencias.value)));
 
   } catch (error) {
      console.error(`[fetchHojaData] Error fetching hoja ${id}:`, error);
      errorMessage.value = `No se pudieron cargar los datos de la hoja (ID: ${id}).`;
      if (error.response?.status === 404) {
          errorMessage.value += " La hoja no fue encontrada.";
-         setTimeout(() => router.push('/lista'), 3000);
+         setTimeout(() => router.push('/lista'), 3000); // Asumiendo que '/lista' es tu ruta de listado
      }
   } finally {
     isLoadingData.value = false;
@@ -115,8 +146,9 @@ const fetchHojaData = async (id) => {
 
 const addIncidencia = () => {
   incidencias.value.push({
+    id: null, // Para nuevas incidencias, el id es null
     tipo: '',
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: new Date(), // Usar objeto Date para el Calendar
     descripcion: ''
   });
 };
@@ -125,41 +157,59 @@ const removeIncidencia = (index) => {
   incidencias.value.splice(index, 1);
 };
 
+// Watch para la fecha de expedición principal
+watch(fechaExpedicionDate, (newDateObj) => {
+    hojaData.fecha_expedicion = formatDateToString(newDateObj);
+});
+
+
 const handleSubmit = async () => {
   isLoadingSubmit.value = true;
   errorMessage.value = '';
   validationErrors.value = {};
 
+  // 1. Procesar las fechas de las incidencias ANTES de enviar
+  const processedIncidencias = incidencias.value.map(inc => {
+    return { 
+      ...inc, // Copiar todos los campos, incluyendo id si es una incidencia existente
+      fecha: formatDateToString(inc.fecha) // Formatear a YYYY-MM-DD
+    };
+  });
+
+  // 2. Construir el payload
   const payload = {
     periodo_id: hojaData.periodo_id,
-    fecha_expedicion: hojaData.fecha_expedicion,
+    // Asegurar que fecha_expedicion también esté en el formato correcto
+    fecha_expedicion: formatDateToString(fechaExpedicionDate.value) || hojaData.fecha_expedicion,
     observaciones: hojaData.observaciones,
     jefe_inmediato_id: hojaData.jefe_inmediato_id,
+    // Si es modo creación, añadir personal_id. Si es edición, el backend no debería permitir cambiarlo.
     ...( !isEditing.value && { personal_id: hojaData.personal_id } ),
-    incidencias: incidencias.value
+    incidencias: processedIncidencias
   };
+  
+  console.log(`Enviando ${isEditing.value ? 'PUT' : 'POST'} a /api/hojas${isEditing.value ? '/' + hojaId.value : ''}`, JSON.parse(JSON.stringify(payload)));
 
   try {
     let response;
     if (isEditing.value) {
-      console.log(`Enviando PUT a /api/hojas/${hojaId.value}`, payload);
       response = await axiosInstance.put(`/api/hojas/${hojaId.value}`, payload);
-      // Usar Toast en lugar de alert
-      // toast.add({ severity: 'success', summary: 'Éxito', detail: 'Hoja de Servicio actualizada', life: 3000 });
-       alert('¡Hoja de Servicio actualizada correctamente!'); // Mantener alert por ahora si no tienes Toast configurado aquí
+      alert('¡Hoja de Servicio actualizada correctamente!');
     } else {
-      console.log('Enviando POST a /api/hojas', payload);
-      if (!payload.personal_id) payload.personal_id = hojaData.personal_id;
+      // Para creación, personal_id debe estar en el payload si no se incluyó antes
+      if (!payload.personal_id && hojaData.personal_id) {
+         payload.personal_id = hojaData.personal_id;
+      }
       response = await axiosInstance.post('/api/hojas', payload);
-      // toast.add({ severity: 'success', summary: 'Éxito', detail: 'Hoja de Servicio creada', life: 3000 });
-      alert('¡Hoja de Servicio creada correctamente!'); // Mantener alert por ahora
+      alert('¡Hoja de Servicio creada correctamente!');
     }
     console.log('Respuesta API:', response.data);
-    router.push('/lista');
+    router.push('/lista'); // Ajusta a tu ruta de listado
   } catch (error) {
     console.error(`Error al ${isEditing.value ? 'actualizar' : 'crear'} Hoja de Servicio:`, error);
     if (error.response?.status === 422) {
       validationErrors.value = error.response.data.errors || {};
+      console.log("Errores de validación del backend:", error.response.data.errors);
       errorMessage.value = "Por favor, corrige los errores en el formulario.";
     } else {
       errorMessage.value = error.response?.data?.message || `Ocurrió un error al ${isEditing.value ? 'actualizar' : 'guardar'}. Intenta de nuevo.`;
@@ -173,21 +223,23 @@ const handleSubmit = async () => {
 onMounted(async () => {
   isLoadingData.value = true;
   console.log(`[onMounted] Modo Edición: ${isEditing.value}, Hoja ID: ${hojaId.value}`);
-  // Cargar personal y periodos en paralelo
   await Promise.all([ fetchPersonal(), fetchPeriodos() ]);
   console.log("[onMounted] Listas de Personal y Periodos cargadas.");
-  // Si estamos editando, cargar los datos de la hoja
   if (isEditing.value) {
     await fetchHojaData(hojaId.value);
+  } else {
+    // Modo creación, asegurarse que fechaExpedicionDate esté inicializada
+    fechaExpedicionDate.value = new Date(hojaData.fecha_expedicion + 'T00:00:00'); // Asegurar hora local
   }
-  isLoadingData.value = false; // Marcar como cargado al final
+  isLoadingData.value = false;
 });
 
-// --- Observadores (sin cambios) ---
+// --- Observadores ---
 watch(hojaData, () => {
     if(Object.keys(validationErrors.value).length > 0) validationErrors.value = {};
     if(errorMessage.value) errorMessage.value = '';
 }, { deep: true });
+
 watch(incidencias, () => {
      if(Object.keys(validationErrors.value).length > 0) validationErrors.value = {};
      if(errorMessage.value) errorMessage.value = '';
