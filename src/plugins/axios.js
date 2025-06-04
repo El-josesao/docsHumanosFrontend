@@ -22,7 +22,8 @@ function getCookieValue(cookieName) {
   import axios from 'axios';
   
   const axiosInstance = axios.create({
-    baseURL: 'http://localhost:8000',
+    //baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+    baseURL:'http://localhost:8000',
     withCredentials: true,
     xsrfCookieName: 'XSRF-TOKEN', // Dejamos esto por si acaso
     xsrfHeaderName: 'X-XSRF-TOKEN', // Dejamos esto por si acaso
